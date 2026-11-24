@@ -58,3 +58,47 @@ try:
     _w.inputs["Specular IOR Level"].default_value = 0.8
 except Exception:
     pass
+
+
+# CRIAÇÃO DO TERRENO GRAMADO
+
+def criar_terreno():
+    tamanho = 30
+
+    for x in range(tamanho):
+        for y in range(tamanho):
+
+            # Define pequenas elevações no terreno
+            altura = int(
+                2 + math.sin(x * 0.3) + math.cos(y * 0.3)
+            )
+
+            altura = max(1, altura)
+
+            # Cria a coluna de terra
+            bpy.ops.mesh.primitive_cube_add(
+                size=1,
+                location=(x, y, (altura - 1) / 2)
+            )
+
+            terra = bpy.context.object
+            terra.name = "Terra"
+            terra.scale.z = altura
+            terra.data.materials.append(MATS["dirt"])
+
+            # Cria a camada de grama
+            bpy.ops.mesh.primitive_cube_add(
+                size=1,
+                location=(x, y, altura - 0.25)
+            )
+
+            grama = bpy.context.object
+            grama.name = "Grama"
+            grama.scale.z = 0.5
+
+            # Escolhe uma das três tonalidades de verde
+            cor = random.choice(["grass1", "grass2", "grass3"])
+            grama.data.materials.append(MATS[cor])
+
+
+criar_terreno()
