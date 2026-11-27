@@ -172,3 +172,119 @@ def criar_terreno():
     bpy.data.meshes.remove(mesh_base)
 
 criar_terreno()
+
+# 4. CRIAÇÃO DA CASA 
+
+def altura_terreno(x, y):
+    # mesma conta do terreno fora do lago
+    return max(2, int(3 + math.sin(x * 0.3) + math.cos(y * 0.3)))
+
+def criar_casa(x0, y0):
+    colecao = bpy.context.scene.collection
+    largura = 5
+    profundidade = 5
+    altura_parede = 3
+
+    mesh_base = bpy.data.meshes.new("CuboBaseCasa")
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bm.to_mesh(mesh_base)
+    bm.free()
+
+    def bloco(nome, x, y, z, material, esc_z=1.0):
+        m = mesh_base.copy()
+        m.materials.append(material)
+        obj = bpy.data.objects.new(nome, m)
+        obj.location = (x, y, z)
+        obj.scale.z = esc_z
+        colecao.objects.link(obj)
+        return obj
+
+    # 4.1 Tira as árvores que ficariam em cima da casa
+    posicoes = set()
+    for o in bpy.data.objects:
+        if (o.name.startswith("Tronco")
+                and x0 - 2 <= o.location.x <= x0 + largura + 1
+                and y0 - 2 <= o.location.y <= y0 + profundidade + 3):
+            posicoes.add((o.location.x, o.location.y))
+
+    for px, py in posicoes:
+        for o in list(bpy.data.objects):
+            if o.name.startswith(("Tronco", "Folha")):
+                if math.hypot(o.location.x - px, o.location.y - py) < 1.6:
+                    bpy.data.objects.remove(o, do_unlink=True)
+
+    # 4.2 Nível do piso = ponto mais alto do terreno embaixo da casa
+    nivel_base = max(altura_terreno(x0 + i, y0 + j)
+                     for i in range(largura) for j in range(profundidade))
+
+    def fundacao(x, y):
+        for z in range(altura_terreno(x, y), nivel_base):
+            mat = MATS["stone"] if (x + y) % 2 == 0 else MATS["stone2"]
+            bloco("Fundacao", x, y, z + 0.5, mat)
+
+    # 4.3 Fundação e piso
+    for i in range(largura):
+        for j in range(profundidade):
+            fundacao(x0 + i, y0 + j)
+            if 1 <= i <= largura - 2 and 1 <= j <= profundidade - 2:
+                bloco("Piso", x0 + i, y0 + j, nivel_base + 0.05, MATS["plank2"], 0.1)
+
+    # 4.4 Paredes (porta virada para +Y, janelas nas laterais)
+    janelas = {(0, 2), (4, 2), (1, 4), (3, 4), (2, 0)}
+    porta_i = largura // 2
+
+    for i in range(largura):
+        for j in range(profundidade):
+            na_borda = i in (0, largura - 1) or j in (0, profundidade - 1)
+            if not na_borda:
+                continue
+            quina = i in (0, largura - 1) and j in (0, profundidade - 1)
+
+            for k in range(altura_parede):
+                x = x0 + i
+                y = y0 + j
+                z = nivel_base + k + 0.5
+
+                if i == porta_i and j == profundidade - 1 and k < 2:
+                    bloco("Porta", x, y, z, MATS["log"])
+                    continue
+                if k == 1 and (i, j) in janelas:
+                    bloco("Janela", x, y, z, MATS["glass"])
+                    continue
+
+                if quina:
+                    mat = MATS["log"]
+                else:
+                    mat = MATS["plank2"] if k == 2 else MATS["plank"]
+                bloco("Parede", x, y, z, mat)
+
+    # 4.5 Telhado em degraus
+    chaminé = (3, 1)
+    camadas = [(-1, 5), (0, 4), (1, 3), (2, 2)]
+    for n, (ini, fim) in enumerate(camadas):
+        z = nivel_base + altura_parede + n + 0.5
+        for i in range(ini, fim + 1):
+            for j in range(ini, fim + 1):
+                if n >= 1 and (i, j) == chaminé:
+                    continue
+                mat = MATS["roof"] if (i + j) % 2 == 0 else MATS["roof2"]
+                bloco("Telhado", x0 + i, y0 + j, z, mat)
+
+    # 4.6 Chaminé
+    for n in range(1, 5):
+        z = nivel_base + altura_parede + n + 0.5
+        bloco("Chamine", x0 + chaminé[0], y0 + chaminé[1], z, MATS["stone2"])
+
+    # 4.7 Caminho na frente da porta
+    x_porta = x0 + porta_i
+    y_soleira = y0 + profundidade
+    fundacao(x_porta, y_soleira)
+    bloco("Caminho", x_porta, y_soleira, nivel_base + 0.1, MATS["path"], 0.2)
+
+    y_fim = y0 + profundidade + 1
+    bloco("Caminho", x_porta, y_fim, altura_terreno(x_porta, y_fim) + 0.1, MATS["path"], 0.2)
+
+    bpy.data.meshes.remove(mesh_base)
+
+criar_casa(2, 22)
