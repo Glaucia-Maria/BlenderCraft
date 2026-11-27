@@ -9,3 +9,6 @@ tde
 
 # part. mirella.02
 - Eu fiz o lago em S e as árvores
+
+# part. gabriel.03
+- Eu fiz a casa.
